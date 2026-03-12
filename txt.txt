@@ -1,0 +1,121 @@
+from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet
+import pandas as pd
+from docx import Document
+import subprocess
+
+
+def footer(canvas, doc):
+    canvas.setFont("Times-Roman", 12)
+
+    # footer separator
+    canvas.line(50, 40, 550, 40)
+
+    page_number = canvas.getPageNumber()
+    canvas.drawString(500, 20, f"Page {page_number}")
+
+
+def plain_page(canvas, doc):
+
+    footer(canvas, doc)
+
+
+def ruled_page(canvas, doc):
+
+    # notebook lines
+    y = 700
+    while y >= 60:
+        canvas.line(50, y, 550, y)
+        y -= 25
+
+    footer(canvas, doc)
+
+
+styles = getSampleStyleSheet()
+styles["Title"].alignment = 1
+
+story = []
+
+print("\nChoose option:")
+print("1 → Convert DOCX to PDF")
+print("2 → Generate PDF from CSV")
+print("3 → Combine CSV + DOCX")
+
+choice = input("Enter option (1/2/3): ")
+
+design = input("Choose page design (1 = plain, 2 = ruled): ")
+
+
+# DOCX → PDF
+if choice == "1":
+
+    docx_path = input("Enter DOCX file path: ")
+
+    subprocess.run([
+        "libreoffice",
+        "--headless",
+        "--convert-to",
+        "pdf",
+        docx_path
+    ])
+
+    print("DOCX converted to PDF")
+    exit()
+
+
+# CSV → PDF
+elif choice == "2":
+
+    csv_path = input("Enter CSV file path: ")
+
+    df = pd.read_csv(csv_path)
+
+    for index, row in df.iterrows():
+
+        topic = row["Topic"]
+        pages = row["Pages"]
+
+        story.append(Paragraph(topic, styles["Title"]))
+        story.append(PageBreak())
+
+        for i in range(pages - 1):
+            story.append(PageBreak())
+
+
+# CSV + DOCX
+elif choice == "3":
+
+    csv_path = input("Enter CSV file path: ")
+    docx_path = input("Enter DOCX file path: ")
+
+    df = pd.read_csv(csv_path)
+
+    document = Document(docx_path)
+
+    doc_text = []
+    for p in document.paragraphs:
+        doc_text.append(p.text)
+
+    for index, row in df.iterrows():
+
+        topic = row["Topic"]
+
+        story.append(Paragraph(topic, styles["Title"]))
+
+        for text in doc_text:
+            story.append(Paragraph(text, styles["Normal"]))
+
+        story.append(PageBreak())
+
+
+pdf = SimpleDocTemplate(
+    "output.pdf",
+    topMargin=35
+)
+
+if design == "2":
+    pdf.build(story, onFirstPage=ruled_page, onLaterPages=ruled_page)
+else:
+    pdf.build(story, onFirstPage=plain_page, onLaterPages=plain_page)
+
+print("PDF generated successfully")
